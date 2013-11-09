@@ -13,6 +13,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.AsyncTask;
+import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -26,6 +27,8 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 	public static final int PROGRESS_STYLE_SMALL = 1;
 	public static final int PROGRESS_STYLE_MEDIUM = 2;
 	public static final int PROGRESS_STYLE_LARGE = 3;
+	private final int IMAGE_TYPE_RESOURCE_ID = 1;
+	private final int IMAGE_TYPE_BITMAP = 2;
 	private final int[] progressStyles = {
 			-1,
 			android.R.attr.progressBarStyleSmall, 
@@ -34,29 +37,155 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 	};
 	private final Context context;
 	private ArrayList<Integer> resourceIds;
-	private int progressBarStyle = -1;
+	private ArrayList<Bitmap> bitmaps;
+	private int progressBarStyle = 2;
+	private ArrayList<Pair<Integer, Integer>> imageValues = new ArrayList<Pair<Integer,Integer>>();
 	
-	public GalleryAdapter(Context context, ArrayList<Integer> resourceIds) {
+	public GalleryAdapter(Context context) {
 		super(context, 0);
 		this.context = context;
-		this.resourceIds = resourceIds;
+		resourceIds = new ArrayList<Integer>();
+		bitmaps = new ArrayList<Bitmap>();
 	}
-
-	public void add(int resourceId) {
+	
+	public void addImageResourceIds(ArrayList<Integer> resourceIds) {
 		
+		for(int i = 0 ; i < resourceIds.size() ; i++) {
+			
+			addImageResourceId(resourceIds.get(i));
+			
+		}
+		
+	}
+	
+	public void addImageBitmaps(ArrayList<Bitmap> bitmaps) {
+
+		for(int i = 0 ; i < bitmaps.size() ; i++) {
+			
+			addImageBitmap(bitmaps.get(i));
+			
+		}
+		
+	}
+	
+	public void addImageResourceId(int resourceId) {
+		
+		imageValues.add(new Pair<Integer, Integer>(IMAGE_TYPE_RESOURCE_ID, resourceIds.size()));
 		resourceIds.add(resourceId);
 		
 	}
 
-	public void add(int resourceId, int index) {
+	public void addImageResourceId(int resourceId, int index) {
 		
-		resourceIds.add(index, resourceId);
+		int addIndex = getAddIndex(IMAGE_TYPE_RESOURCE_ID, index, resourceIds.size());
+		imageValues.add(index, new Pair<Integer, Integer>(IMAGE_TYPE_RESOURCE_ID, addIndex));
+		resourceIds.add(addIndex, resourceId);
+		
+	}
+	
+	public void addImageBitmap(Bitmap bitmap) {
+		
+		imageValues.add(new Pair<Integer, Integer>(IMAGE_TYPE_BITMAP, bitmaps.size()));
+		bitmaps.add(bitmap);
 		
 	}
 
+	public void addImageBitmap(Bitmap bitmap, int index) {
+		
+		int addIndex = getAddIndex(IMAGE_TYPE_BITMAP, index, bitmaps.size());
+		imageValues.add(index, new Pair<Integer, Integer>(IMAGE_TYPE_BITMAP, addIndex));
+		bitmaps.add(addIndex, bitmap);
+		
+	}
+
+	private int getAddIndex(int imageType, int index, int defaultIndex) {
+		
+		boolean firstImageValueFlag = true;
+		Pair<Integer, Integer> imageValue;
+		int imageValueType, imageValueIndex;
+		int addIndex = -1;
+		
+		for(int i = 0; i < imageValues.size(); i++) {
+			
+			imageValue = imageValues.get(i);
+			imageValueType = imageValue.first;
+			imageValueIndex = imageValue.second;
+			
+			if(imageType == imageValueType && i >= index) {
+				
+				if(firstImageValueFlag) {
+					
+					addIndex = imageValueIndex;
+					firstImageValueFlag = false;
+					
+				}
+				
+				imageValues.set(i, new Pair<Integer, Integer>(imageValueType, (imageValueIndex+1)));
+				
+			}
+			
+		}
+		
+		if(addIndex == -1) {
+			
+			return defaultIndex;
+			
+		}
+		
+		return addIndex;
+		
+	}
+	
+	public void replaceImageResourceId(int resourceId, int index) {
+		
+		remove(index);
+		addImageResourceId(resourceId, index);
+		
+	}
+	
+	public void replaceImageBitmap(Bitmap bitmap, int index) {
+		
+		remove(index);
+		addImageBitmap(bitmap, index);
+		
+	}
+	
 	public void remove(int index) {
 		
-		resourceIds.remove(index);
+		Pair<Integer, Integer> imageValue = imageValues.get(index);
+		int imageType = imageValue.first;
+		int imageIndex = imageValue.second;
+		
+		switch(imageType) {
+		case IMAGE_TYPE_RESOURCE_ID:
+			resourceIds.remove(imageIndex);
+			break;
+		case IMAGE_TYPE_BITMAP:
+			bitmaps.remove(imageIndex);
+			break;
+		}
+		
+		imageValues.remove(index);
+		
+		for(int i = index; i < imageValues.size(); i++) {
+			
+			imageValue = imageValues.get(i);
+			
+			if(imageType == imageValue.first) {
+				
+				imageValues.set(i, new Pair<Integer, Integer>(imageValue.first, (imageValue.second-1)));
+				
+			}
+			
+		}
+		
+	}
+	
+	public void removeAll() {
+		
+		bitmaps = new ArrayList<Bitmap>();
+		resourceIds = new ArrayList<Integer>();
+		imageValues = new ArrayList<Pair<Integer,Integer>>();
 		
 	}
 	
@@ -80,9 +209,21 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
     	}
     	
     	SquareImageView squareImageView = new SquareImageView(context, progressBar);
-    	squareImageView.resourceId = resourceIds.get(position);
-    	relativeLayout.addView(squareImageView);
+    	Pair<Integer, Integer> imageValue = imageValues.get(position);
+		int imageType = imageValue.first;
+		int imageIndex = imageValue.second;
     	
+		if(imageType == IMAGE_TYPE_BITMAP) {
+			
+			squareImageView.setImageBitmap(bitmaps.get(imageIndex));
+			
+		} else {
+			
+			squareImageView.resourceId = resourceIds.get(imageIndex);
+			
+		}
+		
+    	relativeLayout.addView(squareImageView);
         return relativeLayout;
         
     }
@@ -90,7 +231,7 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 	@Override
 	public int getCount() {
 		
-		return resourceIds.size();
+		return imageValues.size();
 		
 	}
 	
@@ -161,7 +302,7 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 				if(bitmapWidth > bitmapHeight) {
 					
 					ratio = (float)bitmapHeight / (float)bitmapWidth;
-					bitmap = Bitmap.createScaledBitmap(bitmap, canvasLength, (int)(ratio*canvasLength), false);
+					bitmap = Bitmap.createScaledBitmap(bitmap, canvasLength, (int) Math.ceil(ratio*canvasLength), false);
 					rectStartX = 0;
 					rectStartY = (int) ((float)canvasLength / 2F - (float)bitmap.getHeight() / 2F);
 					rectEndX = canvasLength;
@@ -170,7 +311,7 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 				} else {
 					
 					ratio = (float)bitmapWidth / (float)bitmapHeight;
-					bitmap = Bitmap.createScaledBitmap(bitmap, (int)(ratio*canvasLength), canvasLength, false);
+					bitmap = Bitmap.createScaledBitmap(bitmap, (int) Math.ceil(ratio*canvasLength), canvasLength, false);
 					rectStartX = rectStartY = (int) ((float)canvasLength / 2F - (float)bitmap.getWidth() / 2F);
 					rectStartY = 0;
 					rectEndX = rectStartX + bitmap.getWidth();
@@ -251,13 +392,28 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 }
 /***Sample
 
+	GalleryAdapter galleryAdapter = new GalleryAdapter(this);
+
+	// Resource ID
+
 	ArrayList<Integer> resourceIds = new ArrayList<Integer>();
 	resourceIds.add(R.drawable.drawable0);
 	resourceIds.add(R.drawable.drawable1);
 	resourceIds.add(R.drawable.drawable2);
+	galleryAdapter.addImageResourceIds(resourceIds);
 	
-	GalleryAdapter galleryAdapter = new GalleryAdapter(this, resourceIds);
-	galleryAdapter.setProgressBarStyle(GalleryAdapter.PROGRESS_STYLE_SMALL);	// Or you can use GalleryAdapter.PROGRESS_STYLE_MEDIUM and GalleryAdapter.PROGRESS_STYLE_LARGE
+	// Bitmap
+	
+	ArrayList<Bitmap> bitmaps = new ArrayList<Bitmap>();
+	resourceIds.add(bitmap0);
+	resourceIds.add(bitmap1);
+	resourceIds.add(bitmap2);
+	galleryAdapter.addImageBitmaps(bitmaps);
+	
+	// Progress style: PROGRESS_STYLE_NONE, PROGRESS_STYLE_SMALL, PROGRESS_STYLE_MEDIUM, PROGRESS_STYLE_LARGE
+	
+	galleryAdapter.setProgressBarStyle(GalleryAdapter.PROGRESS_STYLE_MEDIUM);	// Skippable (Default: PROGRESS_STYLE_MEDIUM)
+	
 	
 	GridView gridView = (GridView) findViewById(R.id.gridview);
 	gridView.setAdapter(galleryAdapter);
@@ -269,10 +425,15 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 		@Override
 		public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 			
-			galleryAdapter.add(R.drawable.new_drawable);			// Add
-			galleryAdapter.add(R.drawable.new_drawable, position);	// Add with position
-			galleryAdapter.remove(position);						// Remove
-			gridView.invalidateViews();	// Refresh
+			galleryAdapter.addImageResourceId(R.drawable.new_drawable);					// Add using resource ID
+			galleryAdapter.addImageResourceId(R.drawable.new_drawable, position);		// Add using resource ID with position
+			galleryAdapter.addImageBitmap(bitmap);										// Add bitmap
+			galleryAdapter.addImageBitmap(bitmap, position);							// Add bitmap with position
+			galleryAdapter.replaceImageResourceId(R.drawable.new_drawable, position);	// Replace
+			galleryAdapter.replaceImageBitmap(bitmap, position);						// Replace
+			galleryAdapter.remove(position);											// Remove
+			galleryAdapter.removeAll();													// Remove all
+			gridView.invalidateViews();	// Refresh GridView
 			
 		}
 		
