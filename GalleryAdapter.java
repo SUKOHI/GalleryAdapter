@@ -274,6 +274,10 @@ public class GalleryAdapter extends ArrayAdapter<Bitmap> {
 			    
 			    return;
 			    
+			} else {
+				
+				progressBar.setVisibility(View.GONE);
+				
 			}
 			
 			Bitmap bitmap = bitamBitmapDrawable.getBitmap();
